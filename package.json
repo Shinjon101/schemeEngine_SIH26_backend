@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "nodemon --loader ts-node/esm ./src/server.ts",
     "start": "node dist/server.js",
+    "db:gen": "npx drizzle-kit generate",
+    "db:migrate": "npm run build && node dist/db/migrate.js",
     "build": "tsc"
   },
   "devDependencies": {

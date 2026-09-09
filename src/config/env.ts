@@ -16,6 +16,10 @@ const envSchema = z.object({
     .enum(["trace", "debug", "info", "warn", "error", "fatal"])
     .default("info"),
 
+  LLM_BASE_URL: z.url().default("https://api.groq.com/openai/v1"),
+  LLM_API_KEY: z.string().min(1, "LLM_API_KEY is required for scheme matching"),
+  LLM_MODEL: z.string().default("openai/gpt-oss-120b"),
+
   // OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required for the Scheme Matcher").optional(),
 
   // Optional Admin Credentials for Partner Portal
