@@ -7,6 +7,7 @@ import { findCandidateSchemes } from "./scheme-matching.repository";
 import {
   citizenProfileSchema,
   llmMatchSchema,
+  llmMatchJsonSchema,
   type CitizenProfile,
 } from "./scheme-matching.schema";
 
@@ -27,9 +28,21 @@ export const matchSchemesForCitizen = async (
   const rawCompletion = await completeJson(
     buildSystemPrompt(),
     buildUserPrompt(profile, candidates),
+    { name: "scheme_matches", schema: llmMatchJsonSchema },
   );
 
-  const parsedJson = JSON.parse(rawCompletion); // LLM output — validated immediately below, never trusted raw
+  // Even with strict-mode structured outputs, the completion is still
+  // an untrusted string over the wire (truncation, timeout retries,
+  // provider-side hiccups) — never JSON.parse it unguarded.
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(rawCompletion);
+  } catch (error) {
+    throw HttpError.unprocessable(
+      "Scheme matching service returned malformed data",
+    );
+  }
+
   const { matches } = llmMatchSchema.parse(parsedJson);
 
   const candidateByCode = new Map(candidates.map((c) => [c.code, c]));

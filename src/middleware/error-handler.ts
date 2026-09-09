@@ -4,6 +4,7 @@ import type {
   Request,
   Response,
 } from "express";
+import { ZodError } from "zod";
 import logger from "../config/logger";
 import { HttpError } from "../common/http-error";
 
@@ -14,6 +15,7 @@ export const errorHandler: ErrorRequestHandler = (
   _next: NextFunction,
 ): void => {
   logger.error({ err }, "Unhandled error occurred");
+
   if (err instanceof HttpError) {
     if (err.statusCode >= 500) {
       logger.error(
@@ -35,6 +37,24 @@ export const errorHandler: ErrorRequestHandler = (
       success: false,
       message: err.message,
       ...(err.details && { details: err.details }),
+    });
+    return;
+  }
+
+  // A bare ZodError (e.g. citizenProfileSchema.parse throwing inside
+  // matchSchemesForCitizen) previously fell through to the generic 500
+  // branch below, losing all field-level detail and misreporting a
+  // 4xx-caliber validation failure as a server error.
+  if (err instanceof ZodError) {
+    logger.warn(
+      { issues: err.issues, path: req.path },
+      "Validation error occurred",
+    );
+
+    res.status(422).json({
+      success: false,
+      message: "Validation failed",
+      details: err.issues,
     });
     return;
   }

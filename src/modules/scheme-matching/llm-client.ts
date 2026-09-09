@@ -9,9 +9,24 @@ interface ChatCompletionResponse {
   choices: Array<{ message: { content: string } }>;
 }
 
+export interface JsonSchemaSpec {
+  /** Short identifier for this schema, sent as `json_schema.name`. */
+  name: string;
+  /** JSON Schema object — see json-schema.util.ts for how to derive this from Zod. */
+  schema: Record<string, unknown>;
+  /**
+   * `openai/gpt-oss-120b` on Groq supports constrained decoding
+   * (`strict: true`), which makes schema-violating output structurally
+   * impossible rather than just probable-to-avoid. Defaults to true;
+   * only pass false for a model that only supports best-effort mode.
+   */
+  strict?: boolean;
+}
+
 export const completeJson = async (
   systemPrompt: string,
   userPrompt: string,
+  jsonSchema: JsonSchemaSpec,
 ): Promise<string> => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -26,7 +41,14 @@ export const completeJson = async (
       body: JSON.stringify({
         model: env.LLM_MODEL,
         temperature: 0.2,
-        response_format: { type: "json_object" },
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: jsonSchema.name,
+            strict: jsonSchema.strict ?? true,
+            schema: jsonSchema.schema,
+          },
+        },
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -38,7 +60,7 @@ export const completeJson = async (
     if (!response.ok) {
       const body = await response.text();
       logger.error(
-        { status: response.status, body },
+        { status: response.status, body, schema: jsonSchema.name },
         "LLM provider returned an error",
       );
       throw HttpError.badRequest(

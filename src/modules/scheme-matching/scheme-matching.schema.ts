@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { toStrictJsonSchema } from "./json-schema.util";
 
 export const citizenProfileSchema = z.object({
   annualFamilyIncome: z.number().nonnegative(),
@@ -31,3 +32,8 @@ export const llmMatchSchema = z.object({
 });
 
 export type LlmMatchResult = z.infer<typeof llmMatchSchema>;
+
+// Sent to Groq as the `json_schema` for the recommendation call. Every
+// field here is already required (no `.optional()`), so this converts
+// cleanly to strict mode without needing to rework the Zod shape.
+export const llmMatchJsonSchema = toStrictJsonSchema(llmMatchSchema);

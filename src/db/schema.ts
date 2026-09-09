@@ -11,7 +11,7 @@ import {
   jsonb,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 // ============================================================
 // Enums
@@ -68,6 +68,18 @@ export const applicationStatusEnum = pgEnum("application_status", [
   "sanctioned",
   "disbursed",
   "rejected",
+]);
+
+// Status of a multi-turn citizen intake conversation. "in_progress" is
+// the only status the unique partial index below treats as "active" —
+// once a session resolves (matched/no_match) or times out (abandoned),
+// a new message on the same channel starts a fresh session rather than
+// reusing the closed one.
+export const intakeSessionStatusEnum = pgEnum("intake_session_status", [
+  "in_progress",
+  "matched",
+  "no_match",
+  "abandoned",
 ]);
 
 // ============================================================
@@ -315,6 +327,61 @@ export const applications = pgTable("applications", {
     .notNull()
     .defaultNow(),
 });
+
+// Multi-turn citizen intake state — one row per active conversation.
+// Keyed by channelId (WhatsApp phone number or web session token)
+// rather than userId, because a citizen doesn't have a `users` row
+// until/unless they're ever formally registered; the conversation has
+// to exist before that. Each inbound message merges its extracted
+// deltas into `profile` here rather than the client having to resend
+// everything already said in prior turns.
+export const intakeSessions = pgTable(
+  "intake_sessions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    channelId: varchar("channel_id", { length: 50 }).notNull(),
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+
+    status: intakeSessionStatusEnum("status").notNull().default("in_progress"),
+    detectedLanguage: varchar("detected_language", { length: 10 }),
+
+    // Accumulated slots, merged turn over turn as the citizen provides
+    // more information. Same shape as CitizenInputProfile but every
+    // field is optional mid-conversation.
+    profile: jsonb("profile")
+      .$type<Partial<CitizenInputProfile>>()
+      .notNull()
+      .default({}),
+    missingFields: jsonb("missing_fields")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
+
+    turnCount: integer("turn_count").notNull().default(0),
+
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    // Only one *active* session per channel at a time. A completed or
+    // abandoned session doesn't block a new conversation from starting
+    // on the same channel later — this is a PARTIAL unique index, not
+    // a plain one.
+    uniqueIndex("intake_sessions_active_channel_unique")
+      .on(table.channelId)
+      .where(sql`${table.status} = 'in_progress'`),
+  ],
+);
 
 // ============================================================
 // Relations

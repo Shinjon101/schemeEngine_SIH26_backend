@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte, or } from "drizzle-orm";
 import { db } from "../../db";
 import { schemes } from "../../db/schema";
 import type { CitizenProfile } from "./scheme-matching.schema";
@@ -17,6 +17,14 @@ export const findCandidateSchemes = async (profile: CitizenProfile) => {
     eq(schemes.isActive, true),
     inArray(schemes.category, INTENT_TO_CATEGORIES[profile.intent]),
     gte(schemes.maxAnnualFamilyIncome, profile.annualFamilyIncome.toString()),
+    // minAge/maxAge exist on the schemes table specifically to be
+    // filtered on here — previously they were populated but never
+    // queried, so an age-restricted scheme (e.g. an age-capped
+    // skill-training programme) could still be handed to the LLM and
+    // potentially recommended to a citizen outside its band. Null
+    // bounds mean "no restriction on that side."
+    or(isNull(schemes.minAge), lte(schemes.minAge, profile.age)),
+    or(isNull(schemes.maxAge), gte(schemes.maxAge, profile.age)),
   ];
   if (profile.gender !== "female") {
     conditions.push(eq(schemes.genderEligibility, "all"));
