@@ -31,26 +31,18 @@ export const matchSchemesForCitizen = async (
     { name: "scheme_matches", schema: llmMatchJsonSchema },
   );
 
-  // Even with strict-mode structured outputs, the completion is still
-  // an untrusted string over the wire (truncation, timeout retries,
-  // provider-side hiccups) — never JSON.parse it unguarded.
+  // Structured output still arrives as untrusted wire data.
   let parsedJson: unknown;
   try {
     parsedJson = JSON.parse(rawCompletion);
-  } catch (error) {
+  } catch {
     throw HttpError.unprocessable(
       "Scheme matching service returned malformed data",
     );
   }
 
   const { matches } = llmMatchSchema.parse(parsedJson);
-
   const candidateByCode = new Map(candidates.map((c) => [c.code, c]));
-
-  // Cross-check every match against the actual candidate set. If the
-  // LLM returns a schemeCode we didn't send it, that's a hallucination
-  // — drop it silently rather than surfacing a scheme that was never
-  // eligibility-checked.
   const resolvedMatches = matches
     .map((match) => {
       const scheme = candidateByCode.get(match.schemeCode);

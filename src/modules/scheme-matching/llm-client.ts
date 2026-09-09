@@ -1,13 +1,129 @@
 import { HttpError } from "../../common/http-error";
 import { env } from "../../config/env";
 import { getLogger } from "../../config/logger";
+import CircuitBreaker from "opossum";
 
 const logger = getLogger("llm-client");
 const REQUEST_TIMEOUT_MS = 15_000;
+const MAX_RETRIES = 3;
+const RETRY_BASE_DELAY_MS = 250;
+const RETRY_MAX_DELAY_MS = 4_000;
+const CIRCUIT_TIMEOUT_MS =
+  REQUEST_TIMEOUT_MS * (MAX_RETRIES + 1) + RETRY_MAX_DELAY_MS;
 
 interface ChatCompletionResponse {
   choices: Array<{ message: { content: string } }>;
 }
+
+class RetryableLlmError extends Error {
+  constructor(
+    message: string,
+    public readonly status?: number,
+  ) {
+    super(message);
+    this.name = "RetryableLlmError";
+  }
+}
+
+const delay = (milliseconds: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+
+const isRetryableError = (error: unknown) =>
+  error instanceof RetryableLlmError ||
+  (error instanceof Error && error.name === "AbortError");
+
+const fetchCompletion = async (
+  systemPrompt: string,
+  userPrompt: string,
+  jsonSchema: JsonSchemaSpec,
+): Promise<string> => {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(`${env.LLM_BASE_URL}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${env.LLM_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: env.LLM_MODEL,
+          temperature: 0.2,
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: jsonSchema.name,
+              strict: jsonSchema.strict ?? true,
+              schema: jsonSchema.schema,
+            },
+          },
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const body = await response.text();
+        logger.warn(
+          {
+            status: response.status,
+            body,
+            attempt: attempt + 1,
+            schema: jsonSchema.name,
+          },
+          "LLM provider returned an error",
+        );
+        if (
+          response.status >= 500 ||
+          response.status === 408 ||
+          response.status === 429
+        ) {
+          throw new RetryableLlmError(
+            `LLM provider returned ${response.status}`,
+            response.status,
+          );
+        }
+        throw new Error(`LLM provider returned ${response.status}`);
+      }
+
+      const data = (await response.json()) as ChatCompletionResponse;
+      const content = data.choices[0]?.message.content;
+      if (!content) throw new Error("LLM provider returned an empty response");
+      return content;
+    } catch (error) {
+      if (!isRetryableError(error) || attempt === MAX_RETRIES) throw error;
+
+      const exponentialDelay = Math.min(
+        RETRY_MAX_DELAY_MS,
+        RETRY_BASE_DELAY_MS * 2 ** attempt,
+      );
+      const jitter = Math.floor(Math.random() * exponentialDelay * 0.25);
+      await delay(exponentialDelay + jitter);
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  throw new Error("LLM request exhausted retries");
+};
+
+const completionCircuit = new CircuitBreaker(fetchCompletion, {
+  timeout: CIRCUIT_TIMEOUT_MS,
+  errorThresholdPercentage: 50,
+  volumeThreshold: 5,
+  resetTimeout: 30_000,
+});
+
+completionCircuit.on("open", () => logger.warn("LLM circuit breaker opened"));
+completionCircuit.on("halfOpen", () =>
+  logger.info("LLM circuit breaker probing provider"),
+);
+completionCircuit.on("close", () => logger.info("LLM circuit breaker closed"));
 
 export interface JsonSchemaSpec {
   /** Short identifier for this schema, sent as `json_schema.name`. */
@@ -28,63 +144,16 @@ export const completeJson = async (
   userPrompt: string,
   jsonSchema: JsonSchemaSpec,
 ): Promise<string> => {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
   try {
-    const response = await fetch(`${env.LLM_BASE_URL}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${env.LLM_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: env.LLM_MODEL,
-        temperature: 0.2,
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: jsonSchema.name,
-            strict: jsonSchema.strict ?? true,
-            schema: jsonSchema.schema,
-          },
-        },
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-      }),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      const body = await response.text();
-      logger.error(
-        { status: response.status, body, schema: jsonSchema.name },
-        "LLM provider returned an error",
-      );
-      throw HttpError.badRequest(
-        "Scheme matching service is temporarily unavailable",
-      );
-    }
-
-    const data = (await response.json()) as ChatCompletionResponse;
-    const content = data.choices[0]?.message.content;
-
-    if (!content) {
-      throw HttpError.badRequest(
-        "Scheme matching service returned an empty response",
-      );
-    }
-
-    return content;
+    return await completionCircuit.fire(systemPrompt, userPrompt, jsonSchema);
   } catch (error) {
     if (error instanceof HttpError) throw error;
-    logger.error({ err: error }, "Failed to reach LLM provider");
+    logger.error(
+      { err: error, schema: jsonSchema.name },
+      "LLM completion failed",
+    );
     throw HttpError.badRequest(
       "Scheme matching service is temporarily unavailable",
     );
-  } finally {
-    clearTimeout(timeout);
   }
 };

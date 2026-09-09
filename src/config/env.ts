@@ -8,6 +8,8 @@ const envSchema = z.object({
 
   PORT: z.coerce.number().default(3000),
 
+  CORS_ORIGINS: z.string().optional(),
+
   DATABASE_URL: z.url({
     message: "DATABASE_URL must be a valid connection URL",
   }),
