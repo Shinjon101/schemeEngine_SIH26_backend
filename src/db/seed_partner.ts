@@ -11,6 +11,7 @@ const main = async () => {
       latitude: "16.474400",
       longitude: "80.616200",
       npaRatioPercent: "4.20",
+      workingHours: "Mon-Fri 10:00 AM - 5:30 PM",
     },
     {
       name: "Andhra Pradesh State Financial Corporation (APSFC)",
@@ -19,6 +20,7 @@ const main = async () => {
       latitude: "16.506200",
       longitude: "80.648000",
       npaRatioPercent: "5.10",
+      workingHours: "Mon-Fri 10:00 AM - 5:30 PM",
     },
     {
       name: "Assam State Development Corporation for SCs Ltd. (ASCDC)",
@@ -27,6 +29,7 @@ const main = async () => {
       latitude: "26.144500",
       longitude: "91.736200",
       npaRatioPercent: "6.80",
+      workingHours: "Mon-Fri 10:00 AM - 5:30 PM",
     },
     {
       name: "Bihar State SCs Co-operative Development Corporation Ltd. (BSSCCDC)",
@@ -35,6 +38,7 @@ const main = async () => {
       latitude: "25.594100",
       longitude: "85.137600",
       npaRatioPercent: "7.30",
+      workingHours: "Mon-Fri 10:00 AM - 5:30 PM",
     },
     {
       name: "Chandigarh SCs, BCs & Minorities Financial & Development Corporation Ltd. (CSCFDC)",
@@ -43,6 +47,7 @@ const main = async () => {
       latitude: "30.733300",
       longitude: "76.779400",
       npaRatioPercent: "3.90",
+      workingHours: "Mon-Fri 10:00 AM - 5:30 PM",
     },
     {
       name: "Chhatisgarh State Antavasayee Sahkari Fin. & Dev. Corpn. (CGSCFDC)",
@@ -51,6 +56,7 @@ const main = async () => {
       latitude: "21.170200",
       longitude: "81.882500",
       npaRatioPercent: "5.50",
+      workingHours: "Mon-Fri 10:00 AM - 5:30 PM",
     },
     {
       name: "Dadra & Nagar Haveli, Daman & Diu SCs/STs/OBCs & Minorities Financial & Development Corporation (DNDSFDC)",
@@ -59,6 +65,7 @@ const main = async () => {
       latitude: "20.273800",
       longitude: "73.016900",
       npaRatioPercent: "4.60",
+      workingHours: "Mon-Fri 9:30 AM - 6:00 PM",
     },
     {
       name: "Delhi SC/ST/OBC/Minorities & Handicapped Financial & Development Corporation (DSFDC)",
@@ -67,6 +74,7 @@ const main = async () => {
       latitude: "28.749500",
       longitude: "77.056500",
       npaRatioPercent: "6.10",
+      workingHours: "Mon-Fri 10:00 AM - 5:30 PM",
     },
     {
       name: "Gujarat SCs Development Corporation (GSCDC)",
@@ -75,6 +83,7 @@ const main = async () => {
       latitude: "23.215600",
       longitude: "72.636900",
       npaRatioPercent: "3.40",
+      workingHours: "Mon-Fri 10:30 AM - 6:10 PM",
     },
     {
       name: "Dr. Ambedkar Antyodaya Vikas Nigam (S.C.) (DAAVN)",
@@ -83,6 +92,7 @@ const main = async () => {
       latitude: "23.215600",
       longitude: "72.636900",
       npaRatioPercent: "5.90",
+      workingHours: "Mon-Fri 10:30 AM - 6:10 PM",
     },
     {
       name: "Goa State SCs & OBCs Finance and Development Corporation Ltd. (GSCOBCDC)",
@@ -91,6 +101,7 @@ const main = async () => {
       latitude: "15.490900",
       longitude: "73.827800",
       npaRatioPercent: "4.00",
+      workingHours: "Mon-Fri 9:30 AM - 6:00 PM",
     },
     {
       name: "Haryana SCs Fin. and Development Corporation Ltd. (HSCDC)",
@@ -99,6 +110,7 @@ const main = async () => {
       latitude: "30.733300",
       longitude: "76.779400",
       npaRatioPercent: "6.50",
+      workingHours: "Mon-Fri 10:00 AM - 5:30 PM",
     },
 
     // ===================== 11 PSBs =====================
@@ -109,6 +121,7 @@ const main = async () => {
       latitude: "13.082700",
       longitude: "80.270700",
       npaRatioPercent: "8.20",
+      workingHours: "Mon-Fri 10:00 AM - 4:00 PM, Sat (1st/3rd) 10:00 AM - 2:00 PM",
     },
     {
       name: "Bank of Baroda",
@@ -117,6 +130,7 @@ const main = async () => {
       latitude: "22.307200",
       longitude: "73.181200",
       npaRatioPercent: "3.10",
+      workingHours: "Mon-Fri 10:00 AM - 4:00 PM, Sat (1st/3rd) 10:00 AM - 2:00 PM",
     },
     {
       name: "Canara Bank",
@@ -125,6 +139,7 @@ const main = async () => {
       latitude: "12.971600",
       longitude: "77.594600",
       npaRatioPercent: "4.50",
+      workingHours: "Mon-Fri 10:00 AM - 4:00 PM, Sat (1st/3rd) 10:00 AM - 2:00 PM",
     },
     {
       name: "Punjab National Bank",
@@ -133,6 +148,7 @@ const main = async () => {
       latitude: "28.589500",
       longitude: "77.041000",
       npaRatioPercent: "5.80",
+      workingHours: "Mon-Fri 10:00 AM - 4:00 PM, Sat (1st/3rd) 10:00 AM - 2:00 PM",
     },
     {
       name: "Punjab & Sind Bank",
@@ -141,6 +157,7 @@ const main = async () => {
       latitude: "28.641700",
       longitude: "77.175000",
       npaRatioPercent: "7.90",
+      workingHours: "Mon-Fri 10:00 AM - 4:00 PM, Sat (1st/3rd) 10:00 AM - 2:00 PM",
     },
     {
       name: "Union Bank of India",
@@ -149,6 +166,7 @@ const main = async () => {
       latitude: "18.925600",
       longitude: "72.824200",
       npaRatioPercent: "4.90",
+      workingHours: "Mon-Fri 10:00 AM - 4:00 PM, Sat (1st/3rd) 10:00 AM - 2:00 PM",
     },
     {
       name: "Indian Bank",
@@ -157,6 +175,7 @@ const main = async () => {
       latitude: "13.056900",
       longitude: "80.263600",
       npaRatioPercent: "3.70",
+      workingHours: "Mon-Fri 10:00 AM - 4:00 PM, Sat (1st/3rd) 10:00 AM - 2:00 PM",
     },
     {
       name: "Bank of Maharashtra",
@@ -165,6 +184,7 @@ const main = async () => {
       latitude: "18.520400",
       longitude: "73.856700",
       npaRatioPercent: "5.20",
+      workingHours: "Mon-Fri 10:00 AM - 4:00 PM, Sat (1st/3rd) 10:00 AM - 2:00 PM",
     },
     {
       name: "Bank of India",
@@ -173,6 +193,7 @@ const main = async () => {
       latitude: "19.066200",
       longitude: "72.868600",
       npaRatioPercent: "6.30",
+      workingHours: "Mon-Fri 10:00 AM - 4:00 PM, Sat (1st/3rd) 10:00 AM - 2:00 PM",
     },
     {
       name: "Central Bank of India",
@@ -181,6 +202,7 @@ const main = async () => {
       latitude: "18.925600",
       longitude: "72.824200",
       npaRatioPercent: "9.10",
+      workingHours: "Mon-Fri 10:00 AM - 4:00 PM, Sat (1st/3rd) 10:00 AM - 2:00 PM",
     },
     {
       name: "UCO Bank",
@@ -189,6 +211,7 @@ const main = async () => {
       latitude: "22.585200",
       longitude: "88.416200",
       npaRatioPercent: "4.40",
+      workingHours: "Mon-Fri 10:00 AM - 4:00 PM, Sat (1st/3rd) 10:00 AM - 2:00 PM",
     },
 
     // ===================== 7 NBFC-MFIs =====================
@@ -200,6 +223,7 @@ const main = async () => {
       longitude: "76.560400",
       npaRatioPercent: "18.40",
       status: "suspended_high_npa",
+      workingHours: "Mon-Sat 9:30 AM - 6:00 PM",
     },
     {
       name: "Grameen Development & Finance Private Limited",
@@ -208,6 +232,7 @@ const main = async () => {
       latitude: "26.100000",
       longitude: "91.400000",
       npaRatioPercent: "8.60",
+      workingHours: "Mon-Sat 9:30 AM - 6:00 PM",
     },
     {
       name: "ASA International Microfinance Ltd.",
@@ -216,6 +241,7 @@ const main = async () => {
       latitude: "22.576000",
       longitude: "88.434800",
       npaRatioPercent: "6.90",
+      workingHours: "Mon-Sat 9:30 AM - 6:00 PM",
     },
     {
       name: "Midland Microfin Ltd.",
@@ -224,6 +250,7 @@ const main = async () => {
       latitude: "31.326000",
       longitude: "75.576200",
       npaRatioPercent: "9.80",
+      workingHours: "Mon-Sat 9:30 AM - 6:00 PM",
     },
     {
       name: "Satin Creditcare Network Ltd.",
@@ -232,6 +259,7 @@ const main = async () => {
       latitude: "28.459500",
       longitude: "77.026600",
       npaRatioPercent: "7.20",
+      workingHours: "Mon-Sat 9:30 AM - 6:00 PM",
     },
     {
       name: "Pahal Financial Services Pvt. Ltd.",
@@ -240,6 +268,7 @@ const main = async () => {
       latitude: "23.022500",
       longitude: "72.571400",
       npaRatioPercent: "5.40",
+      workingHours: "Mon-Sat 9:30 AM - 6:00 PM",
     },
     {
       name: "Vector Finance PVT LTD",
@@ -249,6 +278,7 @@ const main = async () => {
       longitude: "85.824500",
       npaRatioPercent: "21.70",
       status: "suspended_high_npa",
+      workingHours: "Mon-Sat 9:30 AM - 6:00 PM",
     },
   ]);
 
