@@ -72,6 +72,7 @@ export const matchSchemesForCitizen = async (
   );
 
   return resolvedMatches.map((m) => ({
+    schemeId: m.scheme.id,
     schemeCode: m.scheme.code,
     schemeName: m.scheme.name,
     matchScore: m.matchScore,
