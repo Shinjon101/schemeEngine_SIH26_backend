@@ -10,12 +10,9 @@ import {
   timestamp,
   jsonb,
   uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
-
-// ============================================================
-// Enums
-// ============================================================
 
 export const schemeCategoryEnum = pgEnum("scheme_category", [
   "micro_finance",
@@ -23,6 +20,12 @@ export const schemeCategoryEnum = pgEnum("scheme_category", [
   "education_loan",
   "skill_training",
   "women_focused",
+]);
+
+export const reportedOutcomeEnum = pgEnum("reported_outcome", [
+  "received_loan",
+  "not_received",
+  "still_pending",
 ]);
 
 export const targetPersonaEnum = pgEnum("target_persona", [
@@ -82,11 +85,6 @@ export const intakeSessionStatusEnum = pgEnum("intake_session_status", [
   "abandoned",
 ]);
 
-// ============================================================
-// Types for jsonb columns — kept explicit rather than letting
-// them fall back to `unknown` at the call site.
-// ============================================================
-
 export interface SchemeEligibilityRules {
   // Free-form nuanced clauses the LLM reads as context, e.g.
   // { requiresCourseRecognition: true, excludesPriorDefaulters: true }
@@ -103,26 +101,16 @@ export interface CitizenInputProfile {
   educationStatus?: "none" | "secondary" | "graduate" | "postgraduate";
 }
 
-// ============================================================
-// Schemes — Step 1 focus
-// ============================================================
-
 export const schemes = pgTable(
   "schemes",
   {
     id: uuid("id").defaultRandom().primaryKey(),
 
-    // Identity
     code: varchar("code", { length: 20 }).notNull(), // e.g. "MCF", "TL", "ELS"
     name: varchar("name", { length: 150 }).notNull(),
     category: schemeCategoryEnum("category").notNull(),
     description: text("description").notNull(),
 
-    // Loan sizing — this range doubles as the project-cost ballpark
-    // shown to a citizen who hasn't stated a figure themselves. No
-    // separate cost-reference table needed: a scheme's own bounds are
-    // already scoped to the right category and can't drift out of sync
-    // with the scheme they belong to.
     minLoanAmount: numeric("min_loan_amount", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),
@@ -134,9 +122,6 @@ export const schemes = pgTable(
       .notNull()
       .default(90),
 
-    // Base interest range shown to the recommender. Partner-specific
-    // slabs (schemeInterestSlabs) override this where a scheme's rate
-    // genuinely depends on who disburses it.
     interestRateMinPercent: numeric("interest_rate_min_percent", {
       precision: 5,
       scale: 2,
@@ -146,12 +131,10 @@ export const schemes = pgTable(
       scale: 2,
     }).notNull(),
 
-    // Repayment
     moratoriumMonthsMin: integer("moratorium_months_min").notNull().default(3),
     moratoriumMonthsMax: integer("moratorium_months_max").notNull().default(12),
     repaymentTenureMonths: integer("repayment_tenure_months").notNull(),
 
-    // Hard eligibility filters — the recommender queries on these directly
     maxAnnualFamilyIncome: numeric("max_annual_family_income", {
       precision: 12,
       scale: 2,
@@ -163,10 +146,6 @@ export const schemes = pgTable(
     minAge: integer("min_age"),
     maxAge: integer("max_age"),
 
-    // Soft/nuanced eligibility clauses the LLM reads as context but the
-    // SQL layer doesn't filter on structurally — e.g. "must have secured
-    // admission via an SSC/NSDC-affiliated course", "no prior default on
-    // any NSFDC scheme". Keeps the table stable as scheme fine-print varies.
     eligibilityRules: jsonb("eligibility_rules")
       .$type<SchemeEligibilityRules>()
       .notNull()
@@ -174,8 +153,6 @@ export const schemes = pgTable(
 
     isActive: boolean("is_active").notNull().default(true),
 
-    // Provenance — this data is manually curated from published scheme
-    // guidelines, not pulled from a live API, so traceability matters.
     sourceUrl: text("source_url"),
     lastVerifiedAt: timestamp("last_verified_at", { withTimezone: true }),
 
@@ -189,11 +166,6 @@ export const schemes = pgTable(
   (table) => [uniqueIndex("schemes_code_unique").on(table.code)],
 );
 
-// Interest/repayment terms can vary by *which type* of channel partner
-// disburses the loan (e.g. Udyam Nidhi Yojana: 13% via Cooperative Banks,
-// 15% via Small Finance Banks). This lets a scheme carry zero, one, or
-// many partner-type-specific slabs without denormalizing that variance
-// into the schemes table itself.
 export const schemeInterestSlabs = pgTable(
   "scheme_interest_slabs",
   {
@@ -218,63 +190,6 @@ export const schemeInterestSlabs = pgTable(
     ),
   ],
 );
-
-// ============================================================
-// Channel Partners — Step 3 territory, included now only so
-// Step 1/2 tables have somewhere valid to point their FKs
-// ============================================================
-
-export const channelPartners = pgTable("channel_partners", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  name: varchar("name", { length: 200 }).notNull(),
-  partnerType: partnerTypeEnum("partner_type").notNull(),
-  status: partnerStatusEnum("status").notNull().default("active"),
-
-  latitude: numeric("latitude", { precision: 9, scale: 6 }).notNull(),
-  longitude: numeric("longitude", { precision: 9, scale: 6 }).notNull(),
-  address: text("address").notNull(),
-
-  npaRatioPercent: numeric("npa_ratio_percent", { precision: 5, scale: 2 }),
-  workingHours: text("working_hours"),
-
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
-
-// Which schemes a partner is authorized to process, and how much of
-// their fund allocation remains. This is what the geo-router filters on:
-// "don't route to partners with high NPAs or exhausted quotas."
-export const partnerSchemeQuotas = pgTable(
-  "partner_scheme_quotas",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    partnerId: uuid("partner_id")
-      .notNull()
-      .references(() => channelPartners.id, { onDelete: "cascade" }),
-    schemeId: uuid("scheme_id")
-      .notNull()
-      .references(() => schemes.id, { onDelete: "cascade" }),
-    totalQuotaAmount: numeric("total_quota_amount", {
-      precision: 14,
-      scale: 2,
-    }).notNull(),
-    utilizedAmount: numeric("utilized_amount", { precision: 14, scale: 2 })
-      .notNull()
-      .default("0"),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => [
-    uniqueIndex("partner_scheme_unique").on(table.partnerId, table.schemeId),
-  ],
-);
-
-// ============================================================
-// Users / Recommendations / Applications — later steps, stubbed
-// so Step 2's LLM matching pipeline has a place to persist output
-// ============================================================
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -328,13 +243,6 @@ export const applications = pgTable("applications", {
     .defaultNow(),
 });
 
-// Multi-turn citizen intake state — one row per active conversation.
-// Keyed by channelId (WhatsApp phone number or web session token)
-// rather than userId, because a citizen doesn't have a `users` row
-// until/unless they're ever formally registered; the conversation has
-// to exist before that. Each inbound message merges its extracted
-// deltas into `profile` here rather than the client having to resend
-// everything already said in prior turns.
 export const intakeSessions = pgTable(
   "intake_sessions",
   {
@@ -348,9 +256,6 @@ export const intakeSessions = pgTable(
     status: intakeSessionStatusEnum("status").notNull().default("in_progress"),
     detectedLanguage: varchar("detected_language", { length: 10 }),
 
-    // Accumulated slots, merged turn over turn as the citizen provides
-    // more information. Same shape as CitizenInputProfile but every
-    // field is optional mid-conversation.
     profile: jsonb("profile")
       .$type<Partial<CitizenInputProfile>>()
       .notNull()
@@ -383,9 +288,94 @@ export const intakeSessions = pgTable(
   ],
 );
 
-// ============================================================
-// Relations
-// ============================================================
+export const channelPartners = pgTable(
+  "channel_partners",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: varchar("name", { length: 200 }).notNull(),
+    partnerType: partnerTypeEnum("partner_type").notNull(),
+    status: partnerStatusEnum("status").notNull().default("active"),
+
+    latitude: numeric("latitude", { precision: 9, scale: 6 }).notNull(),
+    longitude: numeric("longitude", { precision: 9, scale: 6 }).notNull(),
+    address: text("address").notNull(),
+
+    npaRatioPercent: numeric("npa_ratio_percent", { precision: 5, scale: 2 }),
+    workingHours: text("working_hours"),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [uniqueIndex("channel_partners_name_unique").on(table.name)],
+);
+
+export const partnerSchemeQuotas = pgTable(
+  "partner_scheme_quotas",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    partnerId: uuid("partner_id")
+      .notNull()
+      .references(() => channelPartners.id, { onDelete: "cascade" }),
+    schemeId: uuid("scheme_id")
+      .notNull()
+      .references(() => schemes.id, { onDelete: "cascade" }),
+    totalQuotaAmount: numeric("total_quota_amount", {
+      precision: 14,
+      scale: 2,
+    }).notNull(),
+    utilizedAmount: numeric("utilized_amount", { precision: 14, scale: 2 })
+      .notNull()
+      .default("0"),
+
+    acceptingApplications: boolean("accepting_applications")
+      .notNull()
+      .default(true),
+
+    lastReportedAt: timestamp("last_reported_at", { withTimezone: true }),
+
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("partner_scheme_unique").on(table.partnerId, table.schemeId),
+  ],
+);
+
+export const partnerOutcomeReports = pgTable(
+  "partner_outcome_reports",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    partnerId: uuid("partner_id")
+      .notNull()
+      .references(() => channelPartners.id, { onDelete: "cascade" }),
+    schemeId: uuid("scheme_id")
+      .notNull()
+      .references(() => schemes.id, { onDelete: "cascade" }),
+    // Nullable: a citizen may report an outcome before a formal
+    // `applications` row exists for the channel they came through.
+    applicationId: uuid("application_id").references(() => applications.id, {
+      onDelete: "set null",
+    }),
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    outcome: reportedOutcomeEnum("outcome").notNull(),
+    reportedAt: timestamp("reported_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("partner_outcome_reports_partner_scheme_idx").on(
+      table.partnerId,
+      table.schemeId,
+    ),
+  ],
+);
 
 export const schemesRelations = relations(schemes, ({ many }) => ({
   interestSlabs: many(schemeInterestSlabs),

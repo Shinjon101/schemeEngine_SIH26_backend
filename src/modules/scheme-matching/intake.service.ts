@@ -16,11 +16,6 @@ import { matchSchemesForCitizen } from "./scheme-matching.service";
 
 const logger = getLogger("intake-service");
 
-// Shown to the citizen when their (complete) profile matched no active
-// scheme. Keep this map small and add languages as the schemes.json
-// content is localized — it's deliberately separate from the LLM's own
-// clarifying-question generation, since "no schemes fit" is a fixed,
-// reviewable message rather than something worth improvising per-turn.
 const NO_MATCH_MESSAGE: Record<string, string> = {
   en: "We couldn't find a scheme matching your profile right now. A representative may follow up.",
   hi: "फ़िलहाल आपकी प्रोफ़ाइल से मेल खाती कोई योजना नहीं मिली। कोई प्रतिनिधि जल्द संपर्क करेगा।",
@@ -39,12 +34,6 @@ const mergeProfile = (
   return merged as Partial<CitizenInputProfile>;
 };
 
-// Entry point for raw citizen text — WhatsApp bot, web chat widget,
-// wherever the message originates. `channelId` (phone number or web
-// session token) is the correlation key across turns: it's what lets
-// this function find the citizen's in-progress conversation and merge
-// this message's extracted fields into what was already collected,
-// rather than re-deriving the whole profile from a single message.
 export const handleCitizenMessage = async (
   rawMessage: string,
   channelId: string,
@@ -113,10 +102,6 @@ export const handleCitizenMessage = async (
       matches,
     };
   } catch (error) {
-    // A complete profile that matches no scheme is an expected outcome,
-    // not a failure — close the session out and tell the citizen in
-    // their own language, instead of letting the generic English error
-    // handler respond (which is what happened before this fix).
     if (error instanceof HttpError && error.statusCode === 404) {
       await updateSession(session.id, {
         profile: mergedProfile,

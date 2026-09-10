@@ -7,6 +7,7 @@ import { env } from "./config/env";
 import { errorHandler } from "./middleware/error-handler";
 import { intakeRouter } from "./modules/scheme-matching/intake.routes";
 import { schemeMatchingRouter } from "./modules/scheme-matching/scheme-matching.routes";
+import { partnerFeedbackRouter } from "./modules/partner-feedback/partner-feedback.routes";
 
 export const createApp = (): Application => {
   const app = express();
@@ -38,6 +39,7 @@ export const createApp = (): Application => {
 
   app.use("/api/intake", intakeRouter);
   app.use("/api/scheme-matching", schemeMatchingRouter);
+  app.use("/api/partner-feedback", partnerFeedbackRouter);
 
   app.use((_req, res) => {
     res.status(404).json({ error: "Route not found" });

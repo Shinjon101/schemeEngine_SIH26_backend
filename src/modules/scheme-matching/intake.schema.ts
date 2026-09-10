@@ -32,13 +32,6 @@ export const intakeExtractionJsonSchema = toStrictJsonSchema(
   intakeExtractionSchema,
 );
 
-// NOTE: `projectType` is required here even though citizenProfileSchema
-// (scheme-matching.schema.ts) has always required it — REQUIRED_FIELDS
-// previously omitted it, which meant a citizen who never restated their
-// project type would sail past the intake "still missing?" check and
-// then throw a raw ZodError out of matchSchemesForCitizen. Keeping this
-// list and citizenProfileSchema's required fields in sync is what makes
-// the "needs_clarification" loop actually terminate in the right place.
 export const REQUIRED_FIELDS = [
   "intent",
   "projectType",

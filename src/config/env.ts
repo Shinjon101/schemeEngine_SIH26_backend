@@ -22,9 +22,6 @@ const envSchema = z.object({
   LLM_API_KEY: z.string().min(1, "LLM_API_KEY is required for scheme matching"),
   LLM_MODEL: z.string().default("openai/gpt-oss-120b"),
 
-  // OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required for the Scheme Matcher").optional(),
-
-  // Optional Admin Credentials for Partner Portal
   ADMIN_EMAIL: z.string().email().optional(),
   ADMIN_PASSWORD: z.string().min(8).optional(),
 });

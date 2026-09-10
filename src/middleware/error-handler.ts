@@ -41,10 +41,6 @@ export const errorHandler: ErrorRequestHandler = (
     return;
   }
 
-  // A bare ZodError (e.g. citizenProfileSchema.parse throwing inside
-  // matchSchemesForCitizen) previously fell through to the generic 500
-  // branch below, losing all field-level detail and misreporting a
-  // 4xx-caliber validation failure as a server error.
   if (err instanceof ZodError) {
     logger.warn(
       { issues: err.issues, path: req.path },
