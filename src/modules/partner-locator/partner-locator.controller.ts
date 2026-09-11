@@ -17,13 +17,13 @@ export const getNearbyPartners = async (
   next: NextFunction,
 ) => {
   try {
-    const schemeId = z.string().uuid().parse(req.params.schemeId);
+    const schemeReference = z.string().min(1).parse(req.params.schemeId);
     const { citizenLat, citizenLng, limit } = citizenLocationSchema.parse(
       req.body,
     );
 
     const result = await locatePartnersForScheme(
-      schemeId,
+      schemeReference,
       citizenLat,
       citizenLng,
       limit,

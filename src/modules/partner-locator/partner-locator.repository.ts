@@ -1,8 +1,25 @@
 import { and, eq } from "drizzle-orm";
+import { validate as isUuid } from "uuid";
 import { HttpError } from "../../common/http-error";
 import { db } from "../../db";
 import { channelPartners, partnerSchemeQuotas, schemes } from "../../db/schema";
 import { isPartnerTypeAuthorizedForScheme } from "./scheme-authorization";
+
+export const resolveSchemeId = async (schemeReference: string) => {
+  const scheme = await db.query.schemes.findFirst({
+    where: eq(
+      isUuid(schemeReference) ? schemes.id : schemes.code,
+      schemeReference,
+    ),
+    columns: { id: true },
+  });
+
+  if (!scheme) {
+    throw HttpError.notFound("Scheme not found");
+  }
+
+  return scheme.id;
+};
 
 export const findEligiblePartners = async (schemeId: string) => {
   return db

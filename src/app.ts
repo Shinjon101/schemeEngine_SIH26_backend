@@ -20,10 +20,13 @@ export const createApp = (): Application => {
 
   app.use(
     cors({
-      origin: allowedOrigins?.length ? allowedOrigins : false,
+      origin: allowedOrigins?.length
+        ? allowedOrigins
+        : ["http://localhost:3000", "http://127.0.0.1:3000"],
+      credentials: true,
     }),
   );
-  app.use(
+  /*  app.use(
     "/api",
     rateLimit({
       windowMs: 15 * 60 * 1000,
@@ -31,7 +34,7 @@ export const createApp = (): Application => {
       standardHeaders: "draft-8",
       legacyHeaders: false,
     }),
-  );
+  ); */
   app.use(express.json());
 
   app.get("/health", (_req, res) => {

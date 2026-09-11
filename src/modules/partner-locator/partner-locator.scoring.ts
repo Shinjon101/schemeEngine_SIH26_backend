@@ -15,7 +15,7 @@ const WEIGHTS = {
   confidence: 0.25,
 } as const;
 
-const MAX_CONSIDERED_RADIUS_KM = 150;
+const MAX_CONSIDERED_RADIUS_KM = 50;
 const NPA_FLOOR_PERCENT = 15;
 
 export interface ScorePartnerInput {
