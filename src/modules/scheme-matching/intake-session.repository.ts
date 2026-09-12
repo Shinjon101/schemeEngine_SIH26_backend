@@ -13,6 +13,7 @@ export type IntakeSessionStatus =
 export const findOrCreateActiveSession = async (
   channelId: string,
   userId?: string,
+  declaredLanguage?: string,
 ) => {
   const existing = await db.query.intakeSessions.findFirst({
     where: and(
@@ -34,9 +35,15 @@ export const findOrCreateActiveSession = async (
       .where(eq(intakeSessions.id, existing.id));
   }
 
+  // Stored at creation rather than only on update, so the very first turn is
+  // already answered in the citizen's language.
   const [created] = await db
     .insert(intakeSessions)
-    .values({ channelId, userId: userId ?? null })
+    .values({
+      channelId,
+      userId: userId ?? null,
+      detectedLanguage: declaredLanguage ?? null,
+    })
     .returning();
 
   return created;

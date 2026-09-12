@@ -11,17 +11,18 @@ import {
   findOrCreateActiveSession,
   updateSession,
 } from "./intake-session.repository";
+import {
+  DEFAULT_LANGUAGE_CODE,
+  isSupportedLanguage,
+  NO_MATCH_MESSAGE,
+  type SupportedLanguageCode,
+} from "./languages";
 import { missingRequiredFields } from "./scheme-matching.schema";
 import { matchSchemesForCitizen } from "./scheme-matching.service";
 
 const logger = getLogger("intake-service");
 
 const INTAKE_SAMPLING_SEED = 20260101;
-
-const NO_MATCH_MESSAGE: Record<string, string> = {
-  en: "We couldn't find a scheme matching your profile right now. A representative may follow up.",
-  hi: "फ़िलहाल आपकी प्रोफ़ाइल से मेल खाती कोई योजना नहीं मिली। कोई प्रतिनिधि जल्द संपर्क करेगा।",
-};
 
 const mergeProfile = (
   known: Partial<CitizenInputProfile>,
@@ -42,11 +43,29 @@ export const handleCitizenMessage = async (
   rawMessage: string,
   channelId: string,
   userId?: string,
+  declaredLanguage?: SupportedLanguageCode,
 ) => {
-  const session = await findOrCreateActiveSession(channelId, userId);
+  const session = await findOrCreateActiveSession(
+    channelId,
+    userId,
+    declaredLanguage,
+  );
+
+  // A language the citizen picked outranks anything inferred from their
+  // words, this turn or an earlier one. Only channels that never offered a
+  // picker fall through to letting the model detect it.
+  const storedLanguage =
+    session.detectedLanguage && isSupportedLanguage(session.detectedLanguage)
+      ? session.detectedLanguage
+      : undefined;
+  const targetLanguage = declaredLanguage ?? storedLanguage;
 
   const completion = await completeJson(
-    buildIntakeSystemPrompt(session.profile, session.missingFields),
+    buildIntakeSystemPrompt(
+      session.profile,
+      session.missingFields,
+      targetLanguage,
+    ),
     rawMessage,
     { name: "citizen_intake", schema: intakeExtractionJsonSchema },
     // Extraction is a parsing job, not a creative one: the same message
@@ -70,6 +89,15 @@ export const handleCitizenMessage = async (
     extraction.extractedProfile,
   );
 
+  // The model echoes the language we asked for, but it is still the model:
+  // trust our own value when we have one, and only fall back to what it
+  // claims to have detected — normalised, since it is a free-form string.
+  const responseLanguage =
+    targetLanguage ??
+    (isSupportedLanguage(extraction.detectedLanguage)
+      ? extraction.detectedLanguage
+      : DEFAULT_LANGUAGE_CODE);
+
   // Authoritative check, using the same required-field rules the web
   // wizard validates against — the LLM's own missingRequiredFields is a
   // hint for phrasing clarifyingQuestion, not something control flow
@@ -83,13 +111,13 @@ export const handleCitizenMessage = async (
     await updateSession(session.id, {
       profile: mergedProfile,
       missingFields: stillMissing,
-      detectedLanguage: extraction.detectedLanguage,
+      detectedLanguage: responseLanguage,
       turnCount: session.turnCount + 1,
     });
 
     return {
       status: "needs_clarification" as const,
-      language: extraction.detectedLanguage,
+      language: responseLanguage,
       question: extraction.clarifyingQuestion,
       missingFields: stillMissing,
       partialProfile: mergedProfile,
@@ -102,14 +130,14 @@ export const handleCitizenMessage = async (
     await updateSession(session.id, {
       profile: mergedProfile,
       missingFields: [],
-      detectedLanguage: extraction.detectedLanguage,
+      detectedLanguage: responseLanguage,
       status: "matched",
       turnCount: session.turnCount + 1,
     });
 
     return {
       status: "matched" as const,
-      language: extraction.detectedLanguage,
+      language: responseLanguage,
       matches,
       // Lets the client follow up on /scheme-matching/summary without
       // having to re-send the whole profile it never assembled.
@@ -120,16 +148,15 @@ export const handleCitizenMessage = async (
       await updateSession(session.id, {
         profile: mergedProfile,
         missingFields: [],
-        detectedLanguage: extraction.detectedLanguage,
+        detectedLanguage: responseLanguage,
         status: "no_match",
         turnCount: session.turnCount + 1,
       });
 
       return {
         status: "no_match" as const,
-        language: extraction.detectedLanguage,
-        message:
-          NO_MATCH_MESSAGE[extraction.detectedLanguage] ?? NO_MATCH_MESSAGE.en,
+        language: responseLanguage,
+        message: NO_MATCH_MESSAGE[responseLanguage],
       };
     }
     throw error;
