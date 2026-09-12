@@ -43,28 +43,25 @@ export const handleCitizenMessage = async (
   rawMessage: string,
   channelId: string,
   userId?: string,
-  declaredLanguage?: SupportedLanguageCode,
+  preferredLanguage?: SupportedLanguageCode,
 ) => {
-  const session = await findOrCreateActiveSession(
-    channelId,
-    userId,
-    declaredLanguage,
-  );
+  const session = await findOrCreateActiveSession(channelId, userId);
 
-  // A language the citizen picked outranks anything inferred from their
-  // words, this turn or an earlier one. Only channels that never offered a
-  // picker fall through to letting the model detect it.
-  const storedLanguage =
+  // Used only when a message has no language of its own ("32", "yes"): keep
+  // speaking whatever the conversation is already in, and before the first
+  // turn, the language the portal is set to.
+  const conversationLanguage =
     session.detectedLanguage && isSupportedLanguage(session.detectedLanguage)
       ? session.detectedLanguage
       : undefined;
-  const targetLanguage = declaredLanguage ?? storedLanguage;
+  const fallbackLanguage =
+    conversationLanguage ?? preferredLanguage ?? DEFAULT_LANGUAGE_CODE;
 
   const completion = await completeJson(
     buildIntakeSystemPrompt(
       session.profile,
       session.missingFields,
-      targetLanguage,
+      fallbackLanguage,
     ),
     rawMessage,
     { name: "citizen_intake", schema: intakeExtractionJsonSchema },
@@ -89,14 +86,10 @@ export const handleCitizenMessage = async (
     extraction.extractedProfile,
   );
 
-  // The model echoes the language we asked for, but it is still the model:
-  // trust our own value when we have one, and only fall back to what it
-  // claims to have detected — normalised, since it is a free-form string.
-  const responseLanguage =
-    targetLanguage ??
-    (isSupportedLanguage(extraction.detectedLanguage)
-      ? extraction.detectedLanguage
-      : DEFAULT_LANGUAGE_CODE);
+  // The language the reply was actually written in. Stored on the session,
+  // it becomes the fallback for the next turn and the language the scheme
+  // summaries are generated in.
+  const responseLanguage = extraction.detectedLanguage;
 
   // Authoritative check, using the same required-field rules the web
   // wizard validates against — the LLM's own missingRequiredFields is a

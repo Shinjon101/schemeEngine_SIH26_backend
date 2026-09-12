@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { toStrictJsonSchema } from "./json-schema.util";
+import { SUPPORTED_LANGUAGE_CODES } from "./languages";
 import { EDUCATION_STATUSES, GENDERS, INTENTS } from "./scheme-matching.schema";
 
 // Every field the recommendation pipeline can use. The chatbot's job is
@@ -7,7 +8,9 @@ import { EDUCATION_STATUSES, GENDERS, INTENTS } from "./scheme-matching.schema";
 // collects is one more filter the Postgres candidate query can apply
 // instead of a signal the ranker has to treat as unknown.
 export const intakeExtractionSchema = z.object({
-  detectedLanguage: z.string(),
+  // Constrained so a free-form guess ("und", "ar") can never become the
+  // conversation language; the strict JSON schema enforces it at generation.
+  detectedLanguage: z.enum(SUPPORTED_LANGUAGE_CODES),
   extractedProfile: z.object({
     intent: z.enum(INTENTS).nullable(),
     isScheduledCaste: z.boolean().nullable(),
@@ -26,7 +29,7 @@ export const intakeExtractionSchema = z.object({
     occupationType: z.string().nullable(),
   }),
   missingRequiredFields: z.array(z.string()),
-  // Written by the LLM in the citizen's own detected language, so the
+  // Written by the LLM in the language of the citizen's message, so the
   // app can display it back verbatim without a separate translation call
   clarifyingQuestion: z.string().nullable(),
 });

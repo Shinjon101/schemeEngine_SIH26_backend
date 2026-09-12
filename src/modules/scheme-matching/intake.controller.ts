@@ -9,10 +9,10 @@ const receiveMessageSchema = z.object({
   // that ties this message to the citizen's in-progress conversation.
   channelId: z.string().min(3).max(50),
   userId: z.string().uuid().optional(),
-  // The language the citizen picked for themselves. Optional because
-  // channels without a language picker (WhatsApp) still fall back to
-  // detecting it from the message.
-  language: z.enum(SUPPORTED_LANGUAGE_CODES).optional(),
+  // The portal language. Only a hint: replies follow the language the
+  // citizen actually writes in, and this is used for messages that have
+  // no language of their own. Channels without a UI (WhatsApp) omit it.
+  preferredLanguage: z.enum(SUPPORTED_LANGUAGE_CODES).optional(),
 });
 
 export const receiveCitizenMessage = async (
@@ -21,14 +21,13 @@ export const receiveCitizenMessage = async (
   next: NextFunction,
 ) => {
   try {
-    const { message, channelId, userId, language } = receiveMessageSchema.parse(
-      req.body,
-    );
+    const { message, channelId, userId, preferredLanguage } =
+      receiveMessageSchema.parse(req.body);
     const result = await handleCitizenMessage(
       message,
       channelId,
       userId,
-      language,
+      preferredLanguage,
     );
     res.status(200).json({ success: true, data: result });
   } catch (error) {

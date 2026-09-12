@@ -1,25 +1,28 @@
 import type { CitizenInputProfile } from "../../db/schema";
 import { OPTIONAL_INTAKE_FIELDS } from "./intake.schema";
-import { languageName, type SupportedLanguageCode } from "./languages";
+import {
+  languageName,
+  SUPPORTED_LANGUAGE_CODES,
+  type SupportedLanguageCode,
+} from "./languages";
 import {
   COMMON_REQUIRED_FIELDS,
   INTENT_REQUIRED_FIELDS,
 } from "./scheme-matching.schema";
 
 /**
- * When the citizen has declared a language we write back in it regardless of
- * what they typed — someone who chose Tamil but typed a bare "32" must not be
- * dropped into English on the strength of one ambiguous token.
+ * The citizen's own words decide the reply language, not the portal setting:
+ * someone on the English site who writes in Hindi is answered in Hindi. The
+ * fallback only covers messages that carry no language of their own, so a
+ * bare "32" in a Tamil conversation does not flip it to English.
  */
-const buildLanguageRule = (outputLanguage?: SupportedLanguageCode) =>
-  outputLanguage
-    ? `- OUTPUT LANGUAGE: the citizen has chosen ${languageName(outputLanguage)} for themselves. Write "clarifyingQuestion" in ${languageName(outputLanguage)}, in that language's own script and never in transliteration, whatever language this message happens to be written in. Report "${outputLanguage}" in detectedLanguage.`
-    : `- Detect the input language and report it in detectedLanguage (using standard ISO language codes). Write "clarifyingQuestion" in that same language.`;
+const buildLanguageRule = (fallbackLanguage: SupportedLanguageCode) =>
+  `- REPLY LANGUAGE: write "clarifyingQuestion" in the language THIS message is written or spoken in, regardless of the language of earlier turns or of the portal. For code-mixed or romanized messages use the dominant Indian language (Hinglish is Hindi). Write every word of the reply in that language's own script and vocabulary — never carry over a Hindi term, such as the one in the example below, into a reply in Tamil, Telugu or any other language. Only if this message has no language of its own — a bare number, a name, "yes", "ok" — reply in ${languageName(fallbackLanguage)}. Report the language you replied in as detectedLanguage, one of ${JSON.stringify(SUPPORTED_LANGUAGE_CODES)}; if the citizen wrote in a language outside that list, reply in ${languageName(fallbackLanguage)} and report "${fallbackLanguage}".`;
 
 export const buildIntakeSystemPrompt = (
   knownProfile: Partial<CitizenInputProfile>,
   stillMissingSoFar: string[],
-  outputLanguage?: SupportedLanguageCode,
+  fallbackLanguage: SupportedLanguageCode,
 ) => `You extract structured loan-application data from a citizen's free-text message, which may be in any language globally, including all Indian languages, English, or code-mixed.
 
 Context: this is one turn in an ongoing conversation. Fields already collected in prior turns:
@@ -36,7 +39,7 @@ ${Object.entries(INTENT_REQUIRED_FIELDS)
 Useful but never blocking: ${JSON.stringify(OPTIONAL_INTAKE_FIELDS)}
 
 Rules:
-${buildLanguageRule(outputLanguage)}
+${buildLanguageRule(fallbackLanguage)}
 - Use the outstanding-fields list to disambiguate short or bare replies — e.g. if only "age" is outstanding, a lone number like "32" is the age, not income. If multiple fields are outstanding and the message gives multiple bare values, match them to fields in the order the outstanding list lists them, unless the message's own wording makes a different mapping obvious.
 - Extract only what THIS message actually states. Never guess or infer a number (income, age, loan amount, project cost) that wasn't mentioned — leave it null rather than estimate.
 - Do not restate a field already present in the known profile above unless this message updates or corrects it.
@@ -47,10 +50,10 @@ ${buildLanguageRule(outputLanguage)}
 - "requiredLoanAmount" is what the citizen wants to BORROW. "estimatedProjectCost" is what the whole venture or course COSTS. These are different numbers — if the message only gives one, fill only that one and leave the other null.
 - "projectType" is the trade or activity being funded ("tailoring unit", "dairy farming"). "course" is the named programme of study ("B.Sc Nursing"). Fill whichever the intent calls for.
 - "occupationCategory" is the broad sector (agriculture, manufacturing, services, trade, artisan) and "occupationType" the specific work within it. Fill them when the citizen describes what they do, even in passing.
-- LANGUAGE OF VALUES: write "projectType", "course", "occupationCategory", "occupationType", "state" and "district" in ENGLISH, using the ordinary English term, whatever language the citizen wrote in. TRANSLATE, never transliterate — "सिलाई का काम" becomes "tailoring", not "silai kaam"; "डेयरी" becomes "dairy farming"; "मुर्गी पालन" becomes "poultry farming". These values are matched against English scheme records downstream, so a transliterated value silently fails to match. This rule applies ONLY to these stored values — "clarifyingQuestion" is still written in the output language given above.
+- LANGUAGE OF VALUES: write "projectType", "course", "occupationCategory", "occupationType", "state" and "district" in ENGLISH, using the ordinary English term, whatever language the citizen wrote in. TRANSLATE, never transliterate — "सिलाई का काम" becomes "tailoring", not "silai kaam"; "डेयरी" becomes "dairy farming"; "मुर्गी पालन" becomes "poultry farming". These values are matched against English scheme records downstream, so a transliterated value silently fails to match. This rule applies ONLY to these stored values — "clarifyingQuestion" is still written in the reply language given above.
 - List every field still null out of the required set for the detected intent in missingRequiredFields, after combining the known profile above with anything extracted from THIS message — not just this message in isolation. If intent is still null, list only the always-required fields.
-- If any required field is missing, write ONE short, polite clarifying question, in the output language given above. Ask for at most three missing fields at a time — a question demanding six answers at once gets abandoned — and lead with the fields nearest the top of the outstanding list. Otherwise set clarifyingQuestion to null.
-- When asking about caste category or income, be matter-of-fact and explain in a few words that it decides eligibility. Never imply suspicion.
+- If any required field is missing, write ONE short, polite clarifying question, in the reply language given above. Ask for at most three missing fields at a time — a question demanding six answers at once gets abandoned — and lead with the fields nearest the top of the outstanding list. Otherwise set clarifyingQuestion to null.
+- When asking about caste category or income, be matter-of-fact and explain in a few words that it decides eligibility. Never imply suspicion. In any language other than Hindi and English, refer to the category as "SC" in Latin letters, the abbreviation used on government forms across India, rather than translating or transliterating "Scheduled Caste".
 - Respond with strict JSON only, matching this exact shape. Do not wrap the response in markdown blocks (e.g. \`\`\`json) — output the raw JSON object directly:
 {
   "detectedLanguage": "hi",
