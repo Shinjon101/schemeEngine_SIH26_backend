@@ -2,6 +2,7 @@ import { HttpError } from "../../common/http-error";
 import { db } from "../../db";
 import { schemeRecommendations } from "../../db/schema";
 import {
+  diagnoseNoMatch,
   findCandidateSchemes,
   findPartnerAvailability,
   type CandidateScheme,
@@ -83,8 +84,13 @@ export const buildRecommendations = async (
   const candidates = await findCandidateSchemes(profile);
 
   if (candidates.length === 0) {
+    const diagnosis = await diagnoseNoMatch(profile);
     throw HttpError.notFound(
       "No schemes currently match this profile's eligibility criteria",
+      {
+        blockingFilter: diagnosis.blockingFilter,
+        reason: diagnosis.explanation,
+      },
     );
   }
 

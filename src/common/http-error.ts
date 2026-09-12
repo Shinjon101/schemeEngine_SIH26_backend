@@ -19,8 +19,11 @@ export class HttpError extends Error {
     return new HttpError(401, message);
   }
 
-  static notFound(message = "Resource not found") {
-    return new HttpError(404, message);
+  static notFound(
+    message = "Resource not found",
+    details?: Record<string, unknown>,
+  ) {
+    return new HttpError(404, message, details);
   }
 
   static unprocessable(

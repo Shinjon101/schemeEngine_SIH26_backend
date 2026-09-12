@@ -115,3 +115,93 @@ export const findPartnerAvailability = async (
 
   return availability;
 };
+
+const inr = (value: number) => `₹${Math.round(value).toLocaleString("en-IN")}`;
+
+/**
+ * Works out WHICH hard filter emptied the candidate list.
+ *
+ * Runs only on the zero-match path, and only once: it pulls the (small)
+ * set of active schemes for the intent and re-applies each filter in
+ * turn in JS, reporting the first one that drops the count to zero.
+ * Without this a 404 says "nothing matched" and the operator has no way
+ * to tell a genuinely ineligible citizen from a mis-sent payload.
+ */
+export const diagnoseNoMatch = async (profile: CitizenProfile) => {
+  const rows = await db.query.schemes.findMany({
+    where: and(
+      eq(schemes.isActive, true),
+      inArray(schemes.category, categoriesForIntent(profile.intent)),
+    ),
+  });
+
+  if (rows.length === 0) {
+    return {
+      blockingFilter: "intent",
+      explanation: `No active schemes are currently loaded for ${profile.intent}.`,
+    };
+  }
+
+  type Row = (typeof rows)[number];
+  const checks: Array<{
+    filter: string;
+    passes: (scheme: Row) => boolean;
+    explain: (surviving: Row[]) => string;
+  }> = [
+    {
+      filter: "annualFamilyIncome",
+      passes: (s) =>
+        Number(s.maxAnnualFamilyIncome) >= profile.annualFamilyIncome,
+      explain: (surviving) =>
+        `Annual family income of ${inr(profile.annualFamilyIncome)} is above the income ceiling of every remaining scheme (the highest is ${inr(
+          Math.max(...surviving.map((s) => Number(s.maxAnnualFamilyIncome))),
+        )}).`,
+    },
+    {
+      filter: "age",
+      passes: (s) =>
+        (s.minAge === null || s.minAge <= profile.age) &&
+        (s.maxAge === null || s.maxAge >= profile.age),
+      explain: () => `Age ${profile.age} falls outside every scheme's age band.`,
+    },
+    {
+      filter: "gender",
+      passes: (s) =>
+        profile.gender === "female" || s.genderEligibility === "all",
+      explain: () =>
+        "Every remaining scheme for this intent is reserved for women applicants.",
+    },
+    {
+      filter: "isScheduledCaste",
+      passes: (s) =>
+        profile.isScheduledCaste ||
+        s.eligibilityRules?.requiresScheduledCaste !== true,
+      explain: () =>
+        "Every remaining scheme requires the applicant to belong to a Scheduled Caste.",
+    },
+    {
+      filter: "requiredLoanAmount",
+      passes: (s) =>
+        profile.requiredLoanAmount === undefined ||
+        Number(s.minLoanAmount) <= profile.requiredLoanAmount,
+      explain: (surviving) =>
+        `The requested amount of ${inr(profile.requiredLoanAmount ?? 0)} is below the minimum loan size of every remaining scheme (the smallest is ${inr(
+          Math.min(...surviving.map((s) => Number(s.minLoanAmount))),
+        )}).`,
+    },
+  ];
+
+  let surviving = rows;
+  for (const check of checks) {
+    const next = surviving.filter(check.passes);
+    if (next.length === 0) {
+      return {
+        blockingFilter: check.filter,
+        explanation: check.explain(surviving),
+      };
+    }
+    surviving = next;
+  }
+
+  return { blockingFilter: null, explanation: null };
+};
