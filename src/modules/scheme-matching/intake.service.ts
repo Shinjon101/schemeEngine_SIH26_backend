@@ -6,15 +6,17 @@ import { buildIntakeSystemPrompt } from "./intake.prompt";
 import {
   intakeExtractionSchema,
   intakeExtractionJsonSchema,
-  REQUIRED_FIELDS,
 } from "./intake.schema";
 import {
   findOrCreateActiveSession,
   updateSession,
 } from "./intake-session.repository";
+import { missingRequiredFields } from "./scheme-matching.schema";
 import { matchSchemesForCitizen } from "./scheme-matching.service";
 
 const logger = getLogger("intake-service");
+
+const INTAKE_SAMPLING_SEED = 20260101;
 
 const NO_MATCH_MESSAGE: Record<string, string> = {
   en: "We couldn't find a scheme matching your profile right now. A representative may follow up.",
@@ -27,6 +29,8 @@ const mergeProfile = (
 ): Partial<CitizenInputProfile> => {
   const merged: Record<string, unknown> = { ...known };
   for (const [key, value] of Object.entries(extracted)) {
+    // null means "this turn said nothing about it", not "clear it".
+    // `false` is a real answer to isScheduledCaste and must survive.
     if (value !== null && value !== undefined) {
       merged[key] = value;
     }
@@ -45,6 +49,10 @@ export const handleCitizenMessage = async (
     buildIntakeSystemPrompt(session.profile, session.missingFields),
     rawMessage,
     { name: "citizen_intake", schema: intakeExtractionJsonSchema },
+    // Extraction is a parsing job, not a creative one: the same message
+    // must always yield the same fields, or the citizen gets asked for
+    // something they already told us.
+    { temperature: 0, seed: INTAKE_SAMPLING_SEED },
   );
 
   let extraction;
@@ -62,12 +70,14 @@ export const handleCitizenMessage = async (
     extraction.extractedProfile,
   );
 
-  // Authoritative check — the LLM's own missingRequiredFields is a hint
-  // for phrasing clarifyingQuestion, not something control flow trusts.
-  const stillMissing = REQUIRED_FIELDS.filter((field) => {
-    const value = (mergedProfile as Record<string, unknown>)[field];
-    return value === null || value === undefined || value === "";
-  });
+  // Authoritative check, using the same required-field rules the web
+  // wizard validates against — the LLM's own missingRequiredFields is a
+  // hint for phrasing clarifyingQuestion, not something control flow
+  // trusts. Because the rule set is intent-conditional, an education
+  // applicant is asked for their course and a trader is not.
+  const stillMissing = missingRequiredFields(
+    mergedProfile as Record<string, unknown>,
+  );
 
   if (stillMissing.length > 0) {
     await updateSession(session.id, {
@@ -81,6 +91,7 @@ export const handleCitizenMessage = async (
       status: "needs_clarification" as const,
       language: extraction.detectedLanguage,
       question: extraction.clarifyingQuestion,
+      missingFields: stillMissing,
       partialProfile: mergedProfile,
     };
   }
@@ -100,6 +111,9 @@ export const handleCitizenMessage = async (
       status: "matched" as const,
       language: extraction.detectedLanguage,
       matches,
+      // Lets the client follow up on /scheme-matching/summary without
+      // having to re-send the whole profile it never assembled.
+      channelId,
     };
   } catch (error) {
     if (error instanceof HttpError && error.statusCode === 404) {

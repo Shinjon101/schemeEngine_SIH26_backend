@@ -7,8 +7,8 @@ export const recommendSchemes = async (
   next: NextFunction,
 ) => {
   try {
-    const results = await matchSchemesForCitizen(req.body, req.body.userId);
-    res.status(200).json({ success: true, data: results });
+    const matches = await matchSchemesForCitizen(req.body, req.body.userId);
+    res.status(200).json({ success: true, data: { matches } });
   } catch (error) {
     next(error);
   }

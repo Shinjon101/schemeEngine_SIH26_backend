@@ -4,6 +4,7 @@ import { getLogger } from "../../config/logger";
 import CircuitBreaker from "opossum";
 
 const logger = getLogger("llm-client");
+const DEFAULT_TEMPERATURE = 0.2;
 const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 250;
@@ -36,6 +37,7 @@ const fetchCompletion = async (
   systemPrompt: string,
   userPrompt: string,
   jsonSchema: JsonSchemaSpec,
+  sampling: SamplingOptions = {},
 ): Promise<string> => {
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
     const controller = new AbortController();
@@ -50,7 +52,8 @@ const fetchCompletion = async (
         },
         body: JSON.stringify({
           model: env.LLM_MODEL,
-          temperature: 0.2,
+          temperature: sampling.temperature ?? DEFAULT_TEMPERATURE,
+          ...(sampling.seed !== undefined && { seed: sampling.seed }),
           response_format: {
             type: "json_schema",
             json_schema: {
@@ -139,13 +142,35 @@ export interface JsonSchemaSpec {
   strict?: boolean;
 }
 
+export interface SamplingOptions {
+  /**
+   * Defaults to 0.2. Pass 0 for extraction-style calls, where the same
+   * message must always yield the same structured fields — a citizen
+   * re-sending a sentence should not get a different answer.
+   */
+  temperature?: number;
+  /**
+   * Fixed seed for reproducible sampling. Combined with temperature 0
+   * this is as close to deterministic as a hosted model gets; the
+   * provider treats it as best-effort, so it tightens the output
+   * without being something correctness may rest on.
+   */
+  seed?: number;
+}
+
 export const completeJson = async (
   systemPrompt: string,
   userPrompt: string,
   jsonSchema: JsonSchemaSpec,
+  sampling?: SamplingOptions,
 ): Promise<string> => {
   try {
-    return await completionCircuit.fire(systemPrompt, userPrompt, jsonSchema);
+    return await completionCircuit.fire(
+      systemPrompt,
+      userPrompt,
+      jsonSchema,
+      sampling ?? {},
+    );
   } catch (error) {
     if (error instanceof HttpError) throw error;
     logger.error(

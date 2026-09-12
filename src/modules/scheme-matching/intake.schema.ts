@@ -1,20 +1,29 @@
 import { z } from "zod";
 import { toStrictJsonSchema } from "./json-schema.util";
+import { EDUCATION_STATUSES, GENDERS, INTENTS } from "./scheme-matching.schema";
 
+// Every field the recommendation pipeline can use. The chatbot's job is
+// to fill this in over as many turns as it takes, because each value it
+// collects is one more filter the Postgres candidate query can apply
+// instead of a signal the ranker has to treat as unknown.
 export const intakeExtractionSchema = z.object({
   detectedLanguage: z.string(),
   extractedProfile: z.object({
-    projectType: z.string().nullable(),
-    intent: z
-      .enum(["business_loan", "education_loan", "skill_training"])
-      .nullable(),
+    intent: z.enum(INTENTS).nullable(),
+    isScheduledCaste: z.boolean().nullable(),
     annualFamilyIncome: z.number().nonnegative().nullable(),
     age: z.number().int().nullable(),
-    gender: z.enum(["male", "female", "other"]).nullable(),
+    gender: z.enum(GENDERS).nullable(),
+    state: z.string().nullable(),
+    district: z.string().nullable(),
+
+    projectType: z.string().nullable(),
+    course: z.string().nullable(),
+    educationStatus: z.enum(EDUCATION_STATUSES).nullable(),
+    requiredLoanAmount: z.number().positive().nullable(),
     estimatedProjectCost: z.number().positive().nullable(),
-    educationStatus: z
-      .enum(["none", "secondary", "graduate", "postgraduate"])
-      .nullable(),
+    occupationCategory: z.string().nullable(),
+    occupationType: z.string().nullable(),
   }),
   missingRequiredFields: z.array(z.string()),
   // Written by the LLM in the citizen's own detected language, so the
@@ -32,10 +41,11 @@ export const intakeExtractionJsonSchema = toStrictJsonSchema(
   intakeExtractionSchema,
 );
 
-export const REQUIRED_FIELDS = [
-  "intent",
-  "projectType",
-  "annualFamilyIncome",
-  "age",
-  "gender",
+// Fields the chatbot may collect but never blocks on. Asking for them
+// improves the ranking; refusing to recommend without them would trap a
+// citizen who simply doesn't know their project cost yet.
+export const OPTIONAL_INTAKE_FIELDS = [
+  "estimatedProjectCost",
+  "occupationCategory",
+  "occupationType",
 ] as const;

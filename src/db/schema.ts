@@ -91,14 +91,32 @@ export interface SchemeEligibilityRules {
   [rule: string]: unknown;
 }
 
+// The citizen data both intakes converge on: the structured web wizard
+// posts it in one shot, the conversational intake accumulates it over
+// several turns. Fields above the blank line are hard filters the
+// Postgres candidate query applies; fields below it only feed the
+// deterministic ranker, so they are optional at the type level and
+// required per-intent by `requiredFieldsFor` in scheme-matching.schema.
 export interface CitizenInputProfile {
+  intent: "business_loan" | "education_loan" | "skill_training";
+  isScheduledCaste: boolean;
   annualFamilyIncome: number;
   age: number;
   gender: "male" | "female" | "other";
-  projectType: string;
-  intent: "business_loan" | "education_loan" | "skill_training";
-  estimatedProjectCost?: number;
+  state: string;
+  district: string;
+
+  projectType?: string;
+  course?: string;
+  skillCategory?: string;
   educationStatus?: "none" | "secondary" | "graduate" | "postgraduate";
+  requiredLoanAmount?: number;
+  estimatedProjectCost?: number;
+  occupationCategory?: string;
+  occupationType?: string;
+  customOccupation?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export const schemes = pgTable(
