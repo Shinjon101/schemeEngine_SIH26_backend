@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "description": "AI powered Scheme Recommender",
   "license": "ISC",
-  "main": "server.js",
+  "main": "dist/server.js",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "nodemon --loader ts-node/esm ./src/server.ts",
     "start": "node dist/server.js",

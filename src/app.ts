@@ -14,9 +14,23 @@ export const createApp = (): Application => {
   const app = express();
 
   app.use(helmet());
+  // Comma-separated origins. Trailing slashes are ignored (browsers never
+  // send them), and a "*" matches one subdomain label so Vercel preview
+  // deployments can be allowed with e.g. "https://my-app-*.vercel.app".
   const allowedOrigins = env.CORS_ORIGINS?.split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+    .map((origin) => origin.trim().replace(/\/+$/, ""))
+    .filter(Boolean)
+    .map((origin) =>
+      origin.includes("*")
+        ? new RegExp(
+            `^${origin
+              .split("*")
+              .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&"))
+              .join("[a-z0-9-]+")}$`,
+            "i",
+          )
+        : origin,
+    );
 
   app.use(
     cors({
