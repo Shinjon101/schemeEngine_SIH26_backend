@@ -27,6 +27,7 @@ export interface RankedScheme {
   schemeId: string;
   schemeCode: string;
   schemeName: string;
+  description: string;
   matchScore: number;
   reasoning: string;
   minLoanAmount: string;
@@ -54,6 +55,7 @@ const toRankedScheme = (
     schemeId: scheme.id,
     schemeCode: scheme.code,
     schemeName: scheme.name,
+    description: scheme.description,
     matchScore: compositeScore(scoreBreakdown),
     reasoning: buildReasoning(profile, scheme, availability),
     minLoanAmount: scheme.minLoanAmount,
