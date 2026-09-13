@@ -2,6 +2,7 @@ import { and, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { haversineKm } from "../../common/geo.util";
 import { db } from "../../db";
 import { channelPartners, partnerSchemeQuotas, schemes } from "../../db/schema";
+import { canTakeApplications } from "../partner-locator/partner-eligibility";
 import type { CitizenProfile } from "./scheme-matching.schema";
 import { categoriesForIntent } from "./scheme-matching.scoring";
 import type { PartnerAvailability } from "./scheme-matching.scoring";
@@ -86,12 +87,7 @@ export const findPartnerAvailability = async (
       eq(channelPartners.id, partnerSchemeQuotas.partnerId),
     )
     .where(
-      and(
-        inArray(partnerSchemeQuotas.schemeId, schemeIds),
-        eq(channelPartners.status, "active"),
-        eq(partnerSchemeQuotas.acceptingApplications, true),
-        sql`${partnerSchemeQuotas.utilizedAmount} < ${partnerSchemeQuotas.totalQuotaAmount}`,
-      ),
+      and(inArray(partnerSchemeQuotas.schemeId, schemeIds), canTakeApplications),
     );
 
   const hasGeo = citizenLat !== undefined && citizenLng !== undefined;

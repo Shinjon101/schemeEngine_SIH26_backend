@@ -3,6 +3,7 @@ import { validate as isUuid } from "uuid";
 import { HttpError } from "../../common/http-error";
 import { db } from "../../db";
 import { channelPartners, partnerSchemeQuotas, schemes } from "../../db/schema";
+import { canTakeApplications } from "./partner-eligibility";
 import { isPartnerTypeAuthorizedForScheme } from "./scheme-authorization";
 
 export const resolveSchemeId = async (schemeReference: string) => {
@@ -29,13 +30,7 @@ export const findEligiblePartners = async (schemeId: string) => {
       channelPartners,
       eq(channelPartners.id, partnerSchemeQuotas.partnerId),
     )
-    .where(
-      and(
-        eq(partnerSchemeQuotas.schemeId, schemeId),
-        eq(channelPartners.status, "active"),
-        eq(partnerSchemeQuotas.acceptingApplications, true),
-      ),
-    );
+    .where(and(eq(partnerSchemeQuotas.schemeId, schemeId), canTakeApplications));
 };
 
 export type EligiblePartnerRow = Awaited<
