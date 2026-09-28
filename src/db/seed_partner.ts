@@ -280,6 +280,25 @@ const main = async () => {
       status: "suspended_high_npa",
       workingHours: "Mon-Sat 9:30 AM - 6:00 PM",
     },
+        // ===================== West Bengal additions =====================
+    {
+      name: "West Bengal SCs, STs & OBC Development & Finance Corporation (WBSCSTOBCDFC)",
+      partnerType: "sca",
+      address: "CF 217/A/1 Salt Lake Sector-I, (Mangolic Building), Kolkata, West Bengal - 700064",
+      latitude: "22.585200",
+      longitude: "88.408500",
+      npaRatioPercent: "5.00",
+      workingHours: "Mon-Fri 10:00 AM - 5:30 PM",
+    },
+    {
+      name: "West Bengal Gramin Bank",
+      partnerType: "rrb",
+      address: "Natabar Paul Road, Chatterjee Para More, Tikiapara, Howrah, West Bengal - 711101",
+      latitude: "22.595800",
+      longitude: "88.263600",
+      npaRatioPercent: "6.20",
+      workingHours: "Mon-Fri 10:00 AM - 4:00 PM, Sat (1st/3rd) 10:00 AM - 2:00 PM",
+    },
   ]);
 
   console.log("Channel partners seed completed");
