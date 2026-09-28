@@ -14,29 +14,65 @@ export const createApp = (): Application => {
   const app = express();
 
   app.use(helmet());
-  // Comma-separated origins. Trailing slashes are ignored (browsers never
-  // send them), and a "*" matches one subdomain label so Vercel preview
-  // deployments can be allowed with e.g. "https://my-app-*.vercel.app".
-  const allowedOrigins = env.CORS_ORIGINS?.split(",")
-    .map((origin) => origin.trim().replace(/\/+$/, ""))
+  const allowedOrigins = (env.CORS_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
     .filter(Boolean)
-    .map((origin) =>
-      origin.includes("*")
-        ? new RegExp(
-            `^${origin
-              .split("*")
-              .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&"))
-              .join("[a-z0-9-]+")}$`,
-            "i",
-          )
-        : origin,
-    );
+    .map((origin) => {
+      if (origin.includes("*")) {
+        if (!/^https:\/\/[^/]+\.vercel\.app$/.test(origin)) {
+          throw new Error(
+            "CORS_ORIGINS wildcards are only supported for https://*.vercel.app origins",
+          );
+        }
+
+        const escapedOrigin = origin
+          .split("*")
+          .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&"))
+          .join("[a-z0-9-]+");
+
+        return new RegExp(`^${escapedOrigin}$`, "i");
+      }
+
+      const url = new URL(origin);
+      if (url.protocol !== "http:" && url.protocol !== "https:") {
+        throw new Error("CORS_ORIGINS must contain only http(s) origins");
+      }
+      if (
+        url.pathname !== "/" ||
+        url.search ||
+        url.hash ||
+        url.username ||
+        url.password
+      ) {
+        throw new Error(
+          "CORS_ORIGINS entries must be origins without paths, queries, credentials, or fragments",
+        );
+      }
+
+      return url.origin;
+    });
+
+  const corsOrigins = allowedOrigins.length
+    ? allowedOrigins
+    : ["http://localhost:3000", "http://127.0.0.1:3000"];
 
   app.use(
     cors({
-      origin: allowedOrigins?.length
-        ? allowedOrigins
-        : ["http://localhost:3000", "http://127.0.0.1:3000"],
+      origin: (requestOrigin, callback) => {
+        if (!requestOrigin) {
+          callback(null, true);
+          return;
+        }
+
+        const isAllowed = corsOrigins.some((allowedOrigin) =>
+          allowedOrigin instanceof RegExp
+            ? allowedOrigin.test(requestOrigin)
+            : allowedOrigin === requestOrigin,
+        );
+
+        callback(null, isAllowed);
+      },
       credentials: true,
     }),
   );
