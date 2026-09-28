@@ -68,8 +68,7 @@ export const profileShape = {
 
   projectType: z.string().min(1).max(200).optional(),
   course: z.string().min(1).max(200).optional(),
-  // The wizard already collects this on its skill-training step; accepted
-  // here so that path has something to rank on beyond placeholders.
+
   skillCategory: z.string().min(1).max(200).optional(),
   educationStatus: z.enum(EDUCATION_STATUSES).optional(),
   requiredLoanAmount: z.number().positive().optional(),
@@ -96,7 +95,10 @@ export const citizenProfileSchema = z
 
     // Geo is only usable as a pair; a lone coordinate would score every
     // scheme's partner proximity as "unknown" anyway.
-    if ((profile.latitude === undefined) !== (profile.longitude === undefined)) {
+    if (
+      (profile.latitude === undefined) !==
+      (profile.longitude === undefined)
+    ) {
       ctx.addIssue({
         code: "custom",
         path: ["latitude"],
